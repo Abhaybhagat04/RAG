@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuraRAG — Intelligent Document Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="app.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation and Controls -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-glow"></div>
+                <div class="brand-logo">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-cpu">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                        <rect x="9" y="9" width="6" height="6"></rect>
+                        <line x1="9" y1="1" x2="9" y2="4"></line>
+                        <line x1="15" y1="1" x2="15" y2="4"></line>
+                        <line x1="9" y1="20" x2="9" y2="23"></line>
+                        <line x1="15" y1="20" x2="15" y2="23"></line>
+                        <line x1="20" y1="9" x2="23" y2="9"></line>
+                        <line x1="20" y1="15" x2="23" y2="15"></line>
+                        <line x1="1" y1="9" x2="4" y2="9"></line>
+                        <line x1="1" y1="15" x2="4" y2="15"></line>
+                    </svg>
+                </div>
+                <div class="brand-info">
+                    <h1>AuraRAG</h1>
+                    <span>Vector Search AI</span>
+                </div>
+            </div>
+
+            <!-- Database Status Panel -->
+            <div class="sidebar-section">
+                <h3 class="section-title">System Status</h3>
+                <div class="status-panel">
+                    <div class="status-item">
+                        <div class="status-indicator online"></div>
+                        <div class="status-details">
+                            <span class="status-name">ChromaDB Vector Store</span>
+                            <span class="status-desc">Active (./chroma_db)</span>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-indicator online"></div>
+                        <div class="status-details">
+                            <span class="status-name">Embedding Engine</span>
+                            <span class="status-desc">BAAI/bge-small-en</span>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-indicator online" id="groq-indicator"></div>
+                        <div class="status-details">
+                            <span class="status-name">Llama 3.1 LLM</span>
+                            <span class="status-desc">Groq API Connected</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF Upload Panel -->
+            <div class="sidebar-section">
+                <h3 class="section-title">Upload Knowledge Base</h3>
+                <div class="upload-zone" id="upload-zone">
+                    <input type="file" id="file-input" accept=".pdf" style="display: none;">
+                    <div class="upload-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <div class="upload-text">
+                        <p class="upload-primary">Drag & drop PDF here</p>
+                        <p class="upload-secondary">or click to browse</p>
+                    </div>
+                    <div class="upload-loader" id="upload-loader" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>Ingesting document...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Uploaded Documents List -->
+            <div class="sidebar-section files-section flex-grow">
+                <div class="section-header">
+                    <h3 class="section-title">Active Knowledge Base</h3>
+                    <span class="file-count-badge" id="file-count">0 Files</span>
+                </div>
+                <div class="file-list" id="file-list">
+                    <!-- Files injected dynamically by JavaScript -->
+                    <div class="no-files-placeholder">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="9" y1="15" x2="15" y2="15"></line>
+                        </svg>
+                        <p>No documents uploaded yet. Upload a PDF to start asking questions.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Footer Info -->
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">U</div>
+                    <div class="profile-info">
+                        <span class="user-name">Developer Workspace</span>
+                        <span class="user-role">Interactive RAG</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Workspace -->
+        <main class="chat-workspace">
+            <header class="chat-header">
+                <div class="active-agent">
+                    <div class="agent-avatar">AI</div>
+                    <div class="agent-details">
+                        <h2>AuraRAG Agent</h2>
+                        <div class="model-badge">
+                            <span class="pulsing-dot"></span>
+                            llama-3.1-8b-instant via Groq
+                        </div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="btn-clear-chat" title="Clear Chat History">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="btn-icon">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        Clear Chat
+                    </button>
+                </div>
+            </header>
+
+            <!-- Chat History Container -->
+            <div class="chat-messages" id="chat-messages">
+                <!-- Welcome/Onboarding Screen -->
+                <div class="welcome-container" id="welcome-container">
+                    <div class="welcome-hero">
+                        <div class="hero-glow"></div>
+                        <div class="welcome-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                        </div>
+                        <h2>Welcome to AuraRAG</h2>
+                        <p class="welcome-lead">An advanced Retrieval-Augmented Generation (RAG) agent that answers questions based solely on the documents you upload.</p>
+                    </div>
+
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feat-icon" style="color: var(--accent-purple);">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                </svg>
+                            </div>
+                            <h3>1. Upload PDF</h3>
+                            <p>Drag in research papers, resumes, manuals, or notes. ChromaDB will index them in chunks.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feat-icon" style="color: var(--accent-teal);">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                            </div>
+                            <h3>2. Ask Questions</h3>
+                            <p>Ask anything about the uploaded content. AuraRAG performs similarity searches to retrieve context.</p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feat-icon" style="color: var(--accent-blue);">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="9 11 12 14 22 4"></polyline>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                </svg>
+                            </div>
+                            <h3>3. Inspect Sources</h3>
+                            <p>Click "View Context Sources" under any response to see exact excerpts retrieved to build the answer.</p>
+                        </div>
+                    </div>
+
+                    <div class="quick-prompts-section">
+                        <h3>Try asking:</h3>
+                        <div class="quick-prompts" id="quick-prompts">
+                            <button class="prompt-pill">Summarize the main points of the uploaded document.</button>
+                            <button class="prompt-pill">What are the key findings or takeaways?</button>
+                            <button class="prompt-pill">Extract all timeline details or action items.</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator-container" id="typing-indicator" style="display: none;">
+                <div class="indicator-avatar">AI</div>
+                <div class="typing-bubble">
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                    <span class="dot"></span>
+                </div>
+            </div>
+
+            <!-- Input Bar panel -->
+            <footer class="chat-input-area">
+                <form class="input-form" id="chat-form">
+                    <div class="input-glow-wrapper">
+                        <textarea 
+                            type="text" 
+                            id="query-input" 
+                            placeholder="Ask a question about your uploaded documents..." 
+                            rows="1"
+                            required
+                        ></textarea>
+                        <button type="submit" class="btn-send" id="btn-send" title="Send Question">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </form>
+                <div class="input-footer-note">
+                    Answers are strictly restricted to the context retrieved from the database to prevent hallucinations.
+                </div>
+            </footer>
+        </main>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toast-container"></div>
+</body>
+</html>
