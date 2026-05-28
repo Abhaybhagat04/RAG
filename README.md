@@ -1,14 +1,14 @@
---
-title: RAG
-emoji: ??
-colorFrom: purple
-colorTo: red
-sdk: docker
-pinned: false
-license: mit
----
+---
+title: RAG
+emoji: 👀
+colorFrom: purple
+colorTo: red
+sdk: docker
+pinned: false
+license: mit
+---
 
-# 📄 RAG Chatbot — PDF Question Answering System
+# 📄 RAG Chatbot — PDF Question Answering System
 
 A **Retrieval-Augmented Generation (RAG)** application that lets you upload PDF documents and ask natural language questions about their content. The backend uses **FastAPI**, **LangChain**, **ChromaDB**, and **Groq LLM (LLaMA 3.1)**, while the frontend is a clean, interactive web interface served directly from the API server.
 
