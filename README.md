@@ -1,6 +1,5 @@
 ---
 title: RAG
-emoji: 👀
 colorFrom: purple
 colorTo: red
 sdk: docker
