@@ -154,3 +154,9 @@ backend/chroma_db/
 storage/
 backend/storage/
 *.db
+
+# Temporary uploaded PDFs (created at runtime, should not be committed)
+backend/temp_*.pdf
+
+# Backend bytecode
+backend/__pycache__/

@@ -1,8 +1,10 @@
 ---
-title: RAG
+title: RAG Chatbot
+emoji: 📄
 colorFrom: purple
-colorTo: red
+colorTo: indigo
 sdk: docker
+app_port: 7860
 pinned: false
 license: mit
 ---
