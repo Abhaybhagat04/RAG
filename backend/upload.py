@@ -41,46 +41,44 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 @router.post("/upload")
 async def upload_pdf(file: UploadFile):
     # Security/Validation: Ensure the uploaded file has a .pdf extension.
-    # Why? Our pipeline uses PyPDFLoader which only understands PDFs. If they upload an image, it would crash the server.
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    # Construct the absolute path where the file will be saved. We prefix it with 'temp_' to identify it as a working file.
-    file_path = os.path.join(APP_DIR, f"temp_{file.filename}")
+    # --- Step 1: Delete ALL previous temp PDFs from disk ---
+    # Why? We only want answers from the currently uploaded document.
+    old_pdfs = glob.glob(os.path.join(APP_DIR, "temp_*.pdf"))
+    for old_pdf in old_pdfs:
+        try:
+            os.remove(old_pdf)
+            print(f"[Upload] Deleted old file: {os.path.basename(old_pdf)}")
+        except Exception as e:
+            print(f"[Upload] Warning: could not delete old file {old_pdf}: {e}")
 
-    # Open the destination file path in write-binary ("wb") mode.
+    # --- Step 2: Wipe the entire ChromaDB collection ---
+    # Why? Ensures zero contamination from previously uploaded documents.
+    try:
+        all_docs = vectordb._collection.get()
+        all_ids = all_docs.get("ids", [])
+        if all_ids:
+            vectordb._collection.delete(ids=all_ids)
+            print(f"[Upload] Cleared {len(all_ids)} chunks from previous documents.")
+    except Exception as e:
+        print(f"[Upload] Warning: could not clear collection: {e}")
+
+    # --- Step 3: Save the new file ---
+    file_path = os.path.join(APP_DIR, f"temp_{file.filename}")
     with open(file_path, "wb") as buffer:
-        # Use shutil to efficiently stream the uploaded file data from memory to the hard drive.
         shutil.copyfileobj(file.file, buffer)
 
-    # --- Duplicate guard: remove existing chunks for this source ---
-    # Why? If a user uploads the same PDF twice, the database will store everything twice, leading to duplicate search results and wasted space.
-    try:
-        # Query the database to find any existing chunks that originated from this exact file path.
-        existing = vectordb._collection.get(
-            where={"source": file_path}
-        )
-        
-        # Extract the unique IDs of those existing chunks.
-        existing_ids = existing.get("ids", [])
-        
-        # If we found IDs, it means the file was uploaded before. Delete them from the database.
-        if existing_ids:
-            vectordb._collection.delete(ids=existing_ids)
-            print(f"[Upload] Removed {len(existing_ids)} existing chunks for '{file.filename}' before re-indexing.")
-    except Exception as e:
-        # If the duplicate check fails (e.g., database lock), catch the error so the server doesn't crash, but print a warning.
-        print(f"[Upload] Warning: could not check for duplicates: {e}")
-
-    # Trigger the heavy lifting: chunk the PDF and embed it into the database.
+    # --- Step 4: Index the new file ---
     total_chunks = process_pdf(file_path)
 
-    # Return a JSON response to the frontend confirming success and showing how many chunks were generated.
     return {
         "message": "PDF uploaded and indexed successfully",
         "filename": file.filename,
         "chunks": total_chunks
     }
+
 
 
 # Define an endpoint that listens for GET requests at /files.
