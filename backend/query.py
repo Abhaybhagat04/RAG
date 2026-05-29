@@ -38,8 +38,8 @@ router = APIRouter()
 # is guaranteed to be in the environment by the time this line runs.
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
-# The LLM model to use. llama3-8b-8192 is fast, capable, and free-tier friendly on Groq.
-MODEL = "llama3-8b-8192"
+# The LLM model to use. llama-3.1-8b-instant is fast, capable, and free-tier friendly on Groq.
+MODEL = "llama-3.1-8b-instant"
 
 
 @router.post("/query")
@@ -94,6 +94,8 @@ async def query_documents(request: QueryRequest):
             max_tokens=1024,
         )
     except Exception as e:
+        # Print the real Groq error to the terminal for easy debugging.
+        print(f"[Query] Groq API error: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=502,
             detail=f"LLM request failed: {str(e)}"
