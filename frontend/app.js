@@ -1,8 +1,9 @@
 // AuraRAG Chatbot Application Logic
 
 document.addEventListener('DOMContentLoaded', () => {
-    // API Route Determination (Relative if served by FastAPI, absolute fallback if file opened directly or run via Live Server)
-    const BASE_URL = window.location.port === '8000' ? '' : 'http://127.0.0.1:8000';
+    // Use same-origin API routes so deployments like Hugging Face Spaces call
+    // the Space backend instead of the user's local machine.
+    const BASE_URL = '';
     
     // DOM Element Selections
     const uploadZone = document.getElementById('upload-zone');
