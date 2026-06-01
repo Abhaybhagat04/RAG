@@ -67,30 +67,44 @@ async def query_documents(request: QueryRequest):
         }
 
     # Build the RAG prompt.
-    # Why separate system and user messages? This is the standard chat format for
-    # instruction-tuned models. The system message sets the assistant's persona and
-    # constraints; the user message contains the actual question + context.
+    # The system message sets the assistant's persona:
+    #   - Ground answers in the provided context.
+    #   - For analytical/opinion questions (e.g. "should I hire this person?"),
+    #     the model IS allowed to reason and give views — but must base them on
+    #     the document. This prevents both hallucination AND over-refusal.
     system_message = (
-        "You are a helpful assistant. Answer the user's question using ONLY the "
-        "context provided below. If the answer is not contained in the context, "
-        "say 'I don't have enough information to answer that based on the provided documents.' "
-        "Do not make up information."
+        "You are an intelligent assistant that helps users understand documents. "
+        "A relevant excerpt from the document is provided in every user message as 'Context'. "
+        "Use that context as your primary source of truth. "
+        "If the user asks for an opinion, analysis, or recommendation (e.g. 'should I hire this person?', "
+        "'what do you think?'), provide a thoughtful, well-reasoned response grounded in the context — "
+        "you are allowed to reason and give views based on the document content. "
+        "If the user's question is a follow-up (e.g. 'give me more', 'tell me more', 'elaborate'), "
+        "use the conversation history and the context to continue your previous answer in more detail. "
+        "Only say you don't know if the context truly contains no relevant information at all."
     )
 
+    # The final user turn: inject the retrieved context + the actual question.
     user_message = (
-        f"Context:\n{context}\n\n"
+        f"Context (retrieved from uploaded document):\n{context}\n\n"
         f"Question: {question}"
     )
+
+    # Build the full message list:
+    # [system] + [prior chat turns] + [current user turn with context]
+    # This lets the LLM understand follow-up messages like "give me more".
+    history = request.chat_history or []
+    messages = [{"role": "system", "content": system_message}]
+    for turn in history:
+        messages.append({"role": turn.role, "content": turn.content})
+    messages.append({"role": "user", "content": user_message})
 
     # Call the Groq LLM.
     try:
         chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_message},
-                {"role": "user",   "content": user_message},
-            ],
+            messages=messages,
             model=MODEL,
-            temperature=0.2,   # Low temperature = more factual, less creative.
+            temperature=0.3,   # Slightly higher for richer analytical answers.
             max_tokens=1024,
         )
     except Exception as e:

@@ -7,12 +7,17 @@ Description:
     automatically validate incoming JSON requests and generate API documentation.
 =============================================================================
 """
-# Import BaseModel from pydantic. 
-# Why? Pydantic is FastAPI's core validation library. Inheriting from BaseModel allows us to define strict data shapes.
+# Import BaseModel and required types from pydantic.
 from pydantic import BaseModel
+from typing import List, Optional
+
+# A single turn in the conversation history.
+class ChatMessage(BaseModel):
+    role: str    # "user" or "assistant"
+    content: str
 
 # Define the expected JSON body for the /query endpoint.
-# Why? If a user sends a request without a 'question' string, FastAPI will automatically reject it with a 422 Error, saving us from writing manual validation logic.
+# chat_history is optional so existing clients without history still work.
 class QueryRequest(BaseModel):
-    # The user's question must be a string.
     question: str
+    chat_history: Optional[List[ChatMessage]] = []

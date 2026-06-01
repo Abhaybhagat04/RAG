@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Application State
     let conversationStarted = false;
     let uploadedFilesList = [];
+    let chatHistory = []; // Tracks all conversation turns for multi-turn context
 
     // --- Dynamic Textarea Auto-grow ---
     queryInput.addEventListener('input', function() {
@@ -138,6 +139,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             showToast(`"${file.name}" ingested successfully! ${data.chunks || 0} chunks added.`, 'success');
+
+            // Auto-clear chat when a new PDF is uploaded so old answers don't persist
+            const rows = chatMessages.querySelectorAll('.message-row');
+            rows.forEach(row => row.remove());
+            chatHistory = [];
+            welcomeContainer.style.display = 'flex';
+            conversationStarted = false;
             
             // Re-fetch files list from system
             fetchActiveFiles();
@@ -236,7 +244,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ question: question })
+                body: JSON.stringify({
+                    question: question,
+                    chat_history: chatHistory  // Send full history for follow-up awareness
+                })
             });
             
             if (!response.ok) {
@@ -247,6 +258,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Hide indicator
             typingIndicator.style.display = 'none';
+            
+            // Store this turn in history BEFORE rendering
+            chatHistory.push({ role: 'user', content: question });
+            chatHistory.push({ role: 'assistant', content: data.answer });
+
+            // Keep history bounded to last 10 turns (5 exchanges) to avoid token overflow
+            if (chatHistory.length > 10) {
+                chatHistory = chatHistory.slice(chatHistory.length - 10);
+            }
             
             // Render LLM response
             appendMessage('ai', data.answer, data.context);
@@ -312,6 +332,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Remove all dynamically appended message rows
         const rows = chatMessages.querySelectorAll('.message-row');
         rows.forEach(row => row.remove());
+        
+        // Reset history so the next chat starts fresh
+        chatHistory = [];
         
         // Restore onboarding panel
         welcomeContainer.style.display = 'flex';
