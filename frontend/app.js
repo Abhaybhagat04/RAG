@@ -32,6 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let uploadedFilesList = [];
     let chatHistory = []; // Tracks conversation turns for context
 
+    document.body.classList.toggle('conversation-active', conversationStarted);
+
     // --- Markdown Ingestion & Highlight Configuration ---
     // Custom renderer for code blocks to add header and copy button
     const renderer = new marked.Renderer();
@@ -78,6 +80,28 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Markdown parsing failed, rendering text:', e);
             return escapeHtml(text);
         }
+    }
+
+    function cleanMarkdownForDisplay(text) {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/__(.*?)__/g, '$1')
+            .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+            .replace(/^\s*[-*]\s+/gm, '- ')
+            .replace(/\n{3,}/g, '\n\n')
+            .trimStart();
+    }
+
+    function cleanMarkdownForRender(text) {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '$1')
+            .replace(/__(.*?)__/g, '$1')
+            .replace(/\n{3,}/g, '\n\n')
+            .trimStart();
+    }
+
+    function splitIntoWordChunks(text) {
+        return text.match(/\S+\s*|\s+/g) || [];
     }
 
     // --- Theme Controller ---
@@ -231,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
             chatHistory = [];
             welcomeContainer.style.display = 'flex';
             conversationStarted = false;
+            document.body.classList.remove('conversation-active');
             
             fetchActiveFiles();
         } catch (error) {
@@ -292,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Conversational Chat Core ---
 
-    // Helper to create a message bubble for streaming updates
+    // Helper to create a message bubble for smooth line-by-line streaming
     function createStreamingMessage(sender) {
         const messageRow = document.createElement('div');
         messageRow.className = `message-row ${sender}`;
@@ -300,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messageRow.innerHTML = `
             <div class="message-avatar">${sender === 'user' ? '<i data-lucide="user"></i>' : '<i data-lucide="bot"></i>'}</div>
             <div class="message-bubble">
-                <div class="message-text"></div>
+                <div class="message-text"><span class="stream-cursor"></span></div>
                 <div class="context-container"></div>
                 <div class="message-actions-container"></div>
             </div>
@@ -310,24 +335,55 @@ document.addEventListener('DOMContentLoaded', () => {
         lucide.createIcons();
         
         const textElement = messageRow.querySelector('.message-text');
+        const cursorEl = textElement.querySelector('.stream-cursor');
         const contextContainer = messageRow.querySelector('.context-container');
         const actionsContainer = messageRow.querySelector('.message-actions-container');
         
-        let fullText = '';
+        let rawText = '';
+        let displayText = '';
         let fullContext = '';
+        
+        // Word queue + timer for readable streaming
+        let wordQueue = [];
+        let isDone = false;
+        
+        // Plain-text node that grows smoothly before final markdown render
+        const streamNode = document.createTextNode('');
+        textElement.insertBefore(streamNode, cursorEl);
+        
+        function flushQueue() {
+            if (wordQueue.length > 0) {
+                const chunk = wordQueue.shift();
+                displayText += chunk;
+                streamNode.nodeValue = cleanMarkdownForDisplay(displayText);
+                scrollToBottom();
+            }
+            
+            if (wordQueue.length > 0 || !isDone) {
+                setTimeout(flushQueue, 55);
+            } else {
+                finalizeRender();
+            }
+        }
+        
+        function finalizeRender() {
+            const cleanText = cleanMarkdownForRender(rawText || displayText);
+            textElement.innerHTML = renderMarkdown(cleanText);
+            textElement.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+            lucide.createIcons();
+            scrollToBottom();
+        }
+        
+        // Start the animation loop
+        setTimeout(flushQueue, 55);
         
         return {
             element: messageRow,
             appendText(token) {
-                fullText += token;
-                textElement.innerHTML = renderMarkdown(fullText);
-                
-                // Re-highlight code snippets inside stream
-                textElement.querySelectorAll('pre code').forEach((block) => {
-                    hljs.highlightElement(block);
-                });
-                
-                lucide.createIcons();
+                rawText += token;
+                wordQueue.push(...splitIntoWordChunks(token));
             },
             setContext(context) {
                 fullContext = context;
@@ -358,20 +414,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             finalize() {
-                // Add action copy buttons when streaming concludes
+                // Stop after draining remaining words.
+                isDone = true;
+                
                 if (sender === 'ai') {
-                    actionsContainer.innerHTML = `
-                        <div class="message-actions-wrapper">
-                            <button class="btn-message-action btn-copy-message">
-                                <i data-lucide="copy"></i> Copy
-                            </button>
-                        </div>
-                    `;
-                    lucide.createIcons();
+                    // Wait for the word queue to drain, then add actions.
+                    const waitForRender = () => {
+                        if (wordQueue.length === 0) {
+                            // Small settle delay so markdown is painted first
+                            setTimeout(() => {
+                                actionsContainer.innerHTML = `
+                                    <div class="message-actions-wrapper">
+                                        <button class="btn-message-action btn-copy-message">
+                                            <i data-lucide="copy"></i> Copy
+                                        </button>
+                                    </div>
+                                `;
+                                lucide.createIcons();
+                            }, 80);
+                        } else {
+                            setTimeout(waitForRender, 55);
+                        }
+                    };
+                    setTimeout(waitForRender, 55);
                 }
             },
             getFullText() {
-                return fullText;
+                return cleanMarkdownForDisplay(rawText || displayText);
             },
             getFullContext() {
                 return fullContext;
@@ -392,6 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!conversationStarted) {
             welcomeContainer.style.display = 'none';
             conversationStarted = true;
+            document.body.classList.add('conversation-active');
         }
         
         appendMessage('user', question);
@@ -475,14 +545,26 @@ document.addEventListener('DOMContentLoaded', () => {
             if (messageUpdater) {
                 messageUpdater.finalize();
                 
-                // Store in history
-                chatHistory.push({ role: 'user', content: question });
-                chatHistory.push({ role: 'assistant', content: messageUpdater.getFullText() });
-
-                // Keep history bounded to last 10 turns (5 exchanges)
-                if (chatHistory.length > 10) {
-                    chatHistory = chatHistory.slice(chatHistory.length - 10);
-                }
+                // Defer history storage until the RAF queue has fully drained
+                // so getFullText() returns the complete accumulated response
+                const storeHistory = () => {
+                    const text = messageUpdater.getFullText();
+                    // If text is still growing wait another frame
+                    requestAnimationFrame(() => {
+                        const textNow = messageUpdater.getFullText();
+                        if (textNow !== text) {
+                            storeHistory(); // still streaming, retry
+                        } else {
+                            chatHistory.push({ role: 'user', content: question });
+                            chatHistory.push({ role: 'assistant', content: textNow });
+                            // Keep history bounded to last 10 turns (5 exchanges)
+                            if (chatHistory.length > 10) {
+                                chatHistory = chatHistory.slice(chatHistory.length - 10);
+                            }
+                        }
+                    });
+                };
+                storeHistory();
             }
             
         } catch (error) {
@@ -521,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (sender === 'user') {
             contentHtml = escapeHtml(text);
         } else {
-            contentHtml = renderMarkdown(text);
+            contentHtml = renderMarkdown(cleanMarkdownForRender(text));
         }
         
         let actionsHtml = '';
@@ -604,6 +686,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatHistory = [];
         welcomeContainer.style.display = 'flex';
         conversationStarted = false;
+        document.body.classList.remove('conversation-active');
         showToast('Chat history cleared.', 'success');
     });
 
@@ -638,3 +721,4 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Onboarding Initializations ---
     fetchActiveFiles();
 });
+

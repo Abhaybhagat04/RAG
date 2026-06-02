@@ -9,7 +9,7 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Markdown Parser & Code Syntax Highlighter -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -31,11 +31,11 @@
             <div class="brand">
                 <div class="logo-glow"></div>
                 <div class="brand-logo">
-                    <i data-lucide="cpu" class="brand-icon-svg"></i>
+                    <i data-lucide="sparkles" class="brand-icon-svg"></i>
                 </div>
                 <div class="brand-info">
-                    <h1>AuraRAG</h1>
-                    <span>Vector Search AI</span>
+                    <h1>My Chats</h1>
+                    <span>Document AI</span>
                 </div>
                 <button class="btn-sidebar-toggle" id="btn-sidebar-collapse" title="Collapse Sidebar">
                     <i data-lucide="chevron-left"></i>
@@ -44,46 +44,44 @@
 
             <!-- Database Status Panel -->
             <div class="sidebar-section">
-                <h3 class="section-title">System Status</h3>
+                <h3 class="section-title">Folders</h3>
                 <div class="status-panel">
                     <div class="status-item">
-                        <i data-lucide="database" class="status-icon"></i>
+                        <i data-lucide="folder" class="status-icon"></i>
                         <div class="status-details">
-                            <span class="status-name">ChromaDB Vector Store</span>
-                            <span class="status-desc">Active (./chroma_db)</span>
+                            <span class="status-name">Work chats</span>
+                            <span class="status-desc">Document research</span>
                         </div>
                         <div class="status-indicator online"></div>
                     </div>
                     <div class="status-item">
-                        <i data-lucide="hash" class="status-icon"></i>
+                        <i data-lucide="heart" class="status-icon"></i>
                         <div class="status-details">
-                            <span class="status-name">Embedding Engine</span>
-                            <span class="status-desc">BAAI/bge-small-en</span>
+                            <span class="status-name">Life chats</span>
+                            <span class="status-desc">Personal notes</span>
                         </div>
-                        <div class="status-indicator online"></div>
                     </div>
                     <div class="status-item">
-                        <i data-lucide="server" class="status-icon"></i>
+                        <i data-lucide="layers" class="status-icon"></i>
                         <div class="status-details">
-                            <span class="status-name">Llama 3.1 LLM</span>
-                            <span class="status-desc">Groq API Connected</span>
+                            <span class="status-name">Project chats</span>
+                            <span class="status-desc">Active knowledge base</span>
                         </div>
-                        <div class="status-indicator online" id="groq-indicator"></div>
                     </div>
                 </div>
             </div>
 
             <!-- PDF Upload Panel -->
             <div class="sidebar-section">
-                <h3 class="section-title">Upload Knowledge Base</h3>
+                <h3 class="section-title">Knowledge</h3>
                 <div class="upload-zone" id="upload-zone">
                     <input type="file" id="file-input" accept=".pdf" style="display: none;">
                     <div class="upload-icon">
                         <i data-lucide="upload-cloud"></i>
                     </div>
                     <div class="upload-text">
-                        <p class="upload-primary">Drag & drop PDF here</p>
-                        <p class="upload-secondary">or click to browse</p>
+                        <p class="upload-primary">Upload PDF</p>
+                        <p class="upload-secondary">Drag here or browse</p>
                     </div>
                     <div class="upload-loader" id="upload-loader" style="display: none;">
                         <div class="spinner"></div>
@@ -95,7 +93,7 @@
             <!-- Uploaded Documents List -->
             <div class="sidebar-section files-section flex-grow">
                 <div class="section-header">
-                    <h3 class="section-title">Active Knowledge Base</h3>
+                    <h3 class="section-title">Chats</h3>
                     <span class="file-count-badge" id="file-count">0 Files</span>
                 </div>
                 <div class="file-list" id="file-list">
@@ -110,10 +108,10 @@
             <!-- User Footer Info -->
             <div class="sidebar-footer">
                 <div class="user-profile">
-                    <div class="avatar"><i data-lucide="user" class="avatar-icon"></i></div>
+                    <div class="avatar"><i data-lucide="plus" class="avatar-icon"></i></div>
                     <div class="profile-info">
-                        <span class="user-name">Developer Workspace</span>
-                        <span class="user-role">Interactive RAG</span>
+                        <span class="user-name">New chat</span>
+                        <span class="user-role">Start with your document</span>
                     </div>
                 </div>
             </div>
@@ -129,10 +127,10 @@
                     <div class="active-agent">
                         <div class="agent-avatar"><i data-lucide="bot" class="agent-bot-icon"></i></div>
                         <div class="agent-details">
-                            <h2>PDF Agent</h2>
+                            <h2>Name chat</h2>
                             <div class="model-badge">
                                 <span class="pulsing-dot"></span>
-                                llama-3.1-8b-instant via Groq
+                                Chat GPT 5.0
                             </div>
                         </div>
                     </div>
@@ -158,9 +156,8 @@
                         <div class="welcome-icon">
                             <i data-lucide="sparkles" class="welcome-sparkle-icon"></i>
                         </div>
-                        <h2>Welcome to AuraRAG</h2>
-                        <p class="welcome-lead">An advanced Retrieval-Augmented Generation (RAG) agent that answers
-                            questions based solely on the documents you upload.</p>
+                        <h2>How can i help you today?</h2>
+                        <p class="welcome-lead">Ask questions from your uploaded PDFs and get clear answers with context sources.</p>
                     </div>
 
                     <div class="features-grid">
@@ -168,27 +165,27 @@
                             <div class="feat-icon" style="color: var(--accent-purple);">
                                 <i data-lucide="file-up"></i>
                             </div>
-                            <h3>1. Upload PDF</h3>
-                            <p>Drag in research papers, resumes, manuals, or notes. ChromaDB will index them in chunks.</p>
+                            <h3>Saved Prompt Templates</h3>
+                            <p>Reuse useful questions for summaries, skills, timelines, and action items.</p>
                         </div>
                         <div class="feature-card">
                             <div class="feat-icon" style="color: var(--accent-teal);">
                                 <i data-lucide="message-square"></i>
                             </div>
-                            <h3>2. Ask Questions</h3>
-                            <p>Ask anything about the uploaded content. AuraRAG performs similarity searches to retrieve context.</p>
+                            <h3>Media Type Selection</h3>
+                            <p>Upload a PDF and search its chunks with the active vector database.</p>
                         </div>
                         <div class="feature-card">
                             <div class="feat-icon" style="color: var(--accent-blue);">
                                 <i data-lucide="search"></i>
                             </div>
-                            <h3>3. Inspect Sources</h3>
-                            <p>Click "View Context Sources" under any response to see exact excerpts retrieved to build the answer.</p>
+                            <h3>Multilingual Support</h3>
+                            <p>Ask naturally and review retrieved sources below every answer.</p>
                         </div>
                     </div>
 
                     <div class="quick-prompts-section">
-                        <h3>Try asking:</h3>
+                        <h3>AI Text Image Video Music Analytics</h3>
                         <div class="quick-prompts" id="quick-prompts">
                             <button class="prompt-pill">
                                 <i data-lucide="help-circle" class="pill-icon"></i>
