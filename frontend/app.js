@@ -1,11 +1,18 @@
 // AuraRAG Chatbot Application Logic
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Use same-origin API routes so deployments like Hugging Face Spaces call
-    // the Space backend instead of the user's local machine.
+    // Same-origin API routes for deployment flexibility
     const BASE_URL = '';
     
     // DOM Element Selections
+    const sidebar = document.getElementById('sidebar');
+    const btnSidebarCollapse = document.getElementById('btn-sidebar-collapse');
+    const btnSidebarExpand = document.getElementById('btn-sidebar-expand');
+    const btnThemeToggle = document.getElementById('btn-theme-toggle');
+    const themeIcon = document.getElementById('theme-icon');
+    const themeText = document.getElementById('theme-text');
+    const hljsTheme = document.getElementById('hljs-theme');
+    
     const uploadZone = document.getElementById('upload-zone');
     const fileInput = document.getElementById('file-input');
     const uploadLoader = document.getElementById('upload-loader');
@@ -23,7 +30,98 @@ document.addEventListener('DOMContentLoaded', () => {
     // Application State
     let conversationStarted = false;
     let uploadedFilesList = [];
-    let chatHistory = []; // Tracks all conversation turns for multi-turn context
+    let chatHistory = []; // Tracks conversation turns for context
+
+    // --- Markdown Ingestion & Highlight Configuration ---
+    // Custom renderer for code blocks to add header and copy button
+    const renderer = new marked.Renderer();
+    renderer.code = function(first, second) {
+        let code = '';
+        let language = '';
+        
+        if (typeof first === 'object' && first !== null) {
+            code = first.text || '';
+            language = first.lang || 'plaintext';
+        } else {
+            code = first || '';
+            language = second || 'plaintext';
+        }
+        
+        return `
+            <div class="code-block-wrapper">
+                <div class="code-block-header">
+                    <span>${language}</span>
+                    <button class="btn-copy-code" data-code="${encodeURIComponent(code)}">
+                        <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+                        Copy
+                    </button>
+                </div>
+                <pre><code class="hljs language-${language}">${escapeHtml(code)}</code></pre>
+            </div>
+        `;
+    };
+    
+    if (typeof marked.use === 'function') {
+        marked.use({ renderer });
+    } else {
+        marked.setOptions({ renderer });
+    }
+
+    function renderMarkdown(text) {
+        try {
+            if (typeof marked.parse === 'function') {
+                return marked.parse(text);
+            } else {
+                return marked(text);
+            }
+        } catch (e) {
+            console.error('Markdown parsing failed, rendering text:', e);
+            return escapeHtml(text);
+        }
+    }
+
+    // --- Theme Controller ---
+    function setTheme(theme) {
+        if (theme === 'light') {
+            document.body.classList.add('light-theme');
+            themeIcon.setAttribute('data-lucide', 'sun');
+            themeText.textContent = 'Light Mode';
+            if (hljsTheme) {
+                hljsTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+            }
+            localStorage.setItem('theme', 'light');
+        } else {
+            document.body.classList.remove('light-theme');
+            themeIcon.setAttribute('data-lucide', 'moon');
+            themeText.textContent = 'Dark Mode';
+            if (hljsTheme) {
+                hljsTheme.href = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css';
+            }
+            localStorage.setItem('theme', 'dark');
+        }
+        lucide.createIcons();
+    }
+
+    // Initialize Theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+
+    btnThemeToggle.addEventListener('click', () => {
+        const isLight = document.body.classList.contains('light-theme');
+        setTheme(isLight ? 'dark' : 'light');
+        showToast(`Switched to ${isLight ? 'Dark' : 'Light'} Mode`, 'success');
+    });
+
+    // --- Sidebar Collapsible Controller ---
+    btnSidebarCollapse.addEventListener('click', () => {
+        sidebar.classList.add('collapsed');
+        btnSidebarExpand.style.display = 'flex';
+    });
+
+    btnSidebarExpand.addEventListener('click', () => {
+        sidebar.classList.remove('collapsed');
+        btnSidebarExpand.style.display = 'none';
+    });
 
     // --- Dynamic Textarea Auto-grow ---
     queryInput.addEventListener('input', function() {
@@ -31,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         this.style.height = (this.scrollHeight - 4) + 'px';
     });
 
-    // Handle Enter key in textarea (Submit on Enter, newline on Shift+Enter)
     queryInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
@@ -44,27 +141,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         
-        let iconSvg = '';
-        if (type === 'success') {
-            iconSvg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toast-icon">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>`;
-        } else {
-            iconSvg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="toast-icon">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>`;
-        }
+        const iconName = type === 'success' ? 'check' : 'alert-circle';
         
         toast.innerHTML = `
-            ${iconSvg}
+            <i data-lucide="${iconName}" class="toast-icon"></i>
             <div class="toast-message">${message}</div>
         `;
         
         toastContainer.appendChild(toast);
+        lucide.createIcons();
         
         // Slide out and remove after delay
         setTimeout(() => {
@@ -86,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
             handleFileUpload(e.target.files[0]);
-            fileInput.value = ''; // Reset input to allow re-upload of same file
+            fileInput.value = ''; // Reset input
         }
     });
 
@@ -140,14 +225,13 @@ document.addEventListener('DOMContentLoaded', () => {
             
             showToast(`"${file.name}" ingested successfully! ${data.chunks || 0} chunks added.`, 'success');
 
-            // Auto-clear chat when a new PDF is uploaded so old answers don't persist
+            // Auto-clear chat when a new PDF is uploaded
             const rows = chatMessages.querySelectorAll('.message-row');
             rows.forEach(row => row.remove());
             chatHistory = [];
             welcomeContainer.style.display = 'flex';
             conversationStarted = false;
             
-            // Re-fetch files list from system
             fetchActiveFiles();
         } catch (error) {
             console.error('Upload failed:', error);
@@ -177,15 +261,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (uploadedFilesList.length === 0) {
             fileList.innerHTML = `
                 <div class="no-files-placeholder">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                        <line x1="9" y1="15" x2="15" y2="15"></line>
-                    </svg>
+                    <i data-lucide="file-text" class="placeholder-icon"></i>
                     <p>No documents uploaded yet. Upload a PDF to start asking questions.</p>
                 </div>
             `;
             fileCount.textContent = '0 Files';
+            lucide.createIcons();
             return;
         }
         
@@ -197,10 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.className = 'file-card';
             card.innerHTML = `
                 <div class="file-card-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                        <polyline points="14 2 14 8 20 8"></polyline>
-                    </svg>
+                    <i data-lucide="file-text"></i>
                 </div>
                 <div class="file-card-details">
                     <span class="file-card-name" title="${fileName}">${fileName}</span>
@@ -209,9 +287,97 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             fileList.appendChild(card);
         });
+        lucide.createIcons();
     }
 
     // --- Conversational Chat Core ---
+
+    // Helper to create a message bubble for streaming updates
+    function createStreamingMessage(sender) {
+        const messageRow = document.createElement('div');
+        messageRow.className = `message-row ${sender}`;
+        
+        messageRow.innerHTML = `
+            <div class="message-avatar">${sender === 'user' ? '<i data-lucide="user"></i>' : '<i data-lucide="bot"></i>'}</div>
+            <div class="message-bubble">
+                <div class="message-text"></div>
+                <div class="context-container"></div>
+                <div class="message-actions-container"></div>
+            </div>
+        `;
+        
+        chatMessages.appendChild(messageRow);
+        lucide.createIcons();
+        
+        const textElement = messageRow.querySelector('.message-text');
+        const contextContainer = messageRow.querySelector('.context-container');
+        const actionsContainer = messageRow.querySelector('.message-actions-container');
+        
+        let fullText = '';
+        let fullContext = '';
+        
+        return {
+            element: messageRow,
+            appendText(token) {
+                fullText += token;
+                textElement.innerHTML = renderMarkdown(fullText);
+                
+                // Re-highlight code snippets inside stream
+                textElement.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+                
+                lucide.createIcons();
+            },
+            setContext(context) {
+                fullContext = context;
+                if (context && context.trim().length > 0) {
+                    const uniqueId = `source-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+                    contextContainer.innerHTML = `
+                        <div class="sources-accordion">
+                            <button class="sources-trigger" data-target="${uniqueId}">
+                                <i data-lucide="book-open" style="width: 12px; height: 12px; margin-right: 4px;"></i>
+                                View Context Sources
+                            </button>
+                            <div class="sources-content" id="${uniqueId}">${escapeHtml(context)}</div>
+                        </div>
+                    `;
+                    
+                    const trigger = contextContainer.querySelector('.sources-trigger');
+                    const targetContent = contextContainer.querySelector(`#${uniqueId}`);
+                    
+                    trigger.addEventListener('click', () => {
+                        const isActive = trigger.classList.toggle('active');
+                        targetContent.style.display = isActive ? 'block' : 'none';
+                        scrollToBottom();
+                    });
+                    
+                    lucide.createIcons();
+                } else {
+                    contextContainer.innerHTML = '';
+                }
+            },
+            finalize() {
+                // Add action copy buttons when streaming concludes
+                if (sender === 'ai') {
+                    actionsContainer.innerHTML = `
+                        <div class="message-actions-wrapper">
+                            <button class="btn-message-action btn-copy-message">
+                                <i data-lucide="copy"></i> Copy
+                            </button>
+                        </div>
+                    `;
+                    lucide.createIcons();
+                }
+            },
+            getFullText() {
+                return fullText;
+            },
+            getFullContext() {
+                return fullContext;
+            }
+        };
+    }
 
     // Chat submit handler
     chatForm.addEventListener('submit', async (e) => {
@@ -220,24 +386,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const question = queryInput.value.trim();
         if (!question) return;
         
-        // Clear input and reset height
         queryInput.value = '';
         queryInput.style.height = 'auto';
         
-        // Deactivate welcome screen on first query
         if (!conversationStarted) {
             welcomeContainer.style.display = 'none';
             conversationStarted = true;
         }
         
-        // Append user question
         appendMessage('user', question);
         scrollToBottom();
         
-        // Render typing loading state
         typingIndicator.style.display = 'flex';
         scrollToBottom();
         
+        let messageUpdater = null;
         try {
             const response = await fetch(`${BASE_URL}/query`, {
                 method: 'POST',
@@ -246,7 +409,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     question: question,
-                    chat_history: chatHistory  // Send full history for follow-up awareness
+                    chat_history: chatHistory
                 })
             });
             
@@ -254,66 +417,143 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`API error: ${response.status} ${response.statusText}`);
             }
             
-            const data = await response.json();
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
             
-            // Hide indicator
-            typingIndicator.style.display = 'none';
-            
-            // Store this turn in history BEFORE rendering
-            chatHistory.push({ role: 'user', content: question });
-            chatHistory.push({ role: 'assistant', content: data.answer });
-
-            // Keep history bounded to last 10 turns (5 exchanges) to avoid token overflow
-            if (chatHistory.length > 10) {
-                chatHistory = chatHistory.slice(chatHistory.length - 10);
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep last partial line
+                
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (!trimmed) continue;
+                    
+                    if (trimmed.startsWith('data: ')) {
+                        const dataStr = trimmed.slice(6).trim();
+                        if (dataStr === '[DONE]') {
+                            break;
+                        }
+                        
+                        try {
+                            const parsed = JSON.parse(dataStr);
+                            if (parsed.type === 'context') {
+                                if (!messageUpdater) {
+                                    typingIndicator.style.display = 'none';
+                                    messageUpdater = createStreamingMessage('ai');
+                                }
+                                messageUpdater.setContext(parsed.content);
+                                scrollToBottom();
+                            } else if (parsed.type === 'token') {
+                                if (!messageUpdater) {
+                                    typingIndicator.style.display = 'none';
+                                    messageUpdater = createStreamingMessage('ai');
+                                }
+                                messageUpdater.appendText(parsed.content);
+                                scrollToBottom();
+                            } else if (parsed.type === 'error') {
+                                if (!messageUpdater) {
+                                    typingIndicator.style.display = 'none';
+                                    messageUpdater = createStreamingMessage('ai');
+                                }
+                                messageUpdater.appendText(`\n⚠️ Error: ${parsed.content}`);
+                                scrollToBottom();
+                            }
+                        } catch (err) {
+                            console.error('Failed to parse SSE line:', dataStr, err);
+                        }
+                    }
+                }
             }
             
-            // Render LLM response
-            appendMessage('ai', data.answer, data.context);
-            scrollToBottom();
+            typingIndicator.style.display = 'none';
+            
+            if (messageUpdater) {
+                messageUpdater.finalize();
+                
+                // Store in history
+                chatHistory.push({ role: 'user', content: question });
+                chatHistory.push({ role: 'assistant', content: messageUpdater.getFullText() });
+
+                // Keep history bounded to last 10 turns (5 exchanges)
+                if (chatHistory.length > 10) {
+                    chatHistory = chatHistory.slice(chatHistory.length - 10);
+                }
+            }
+            
         } catch (error) {
             console.error('Chat query failed:', error);
             typingIndicator.style.display = 'none';
-            appendMessage('ai', `⚠️ Connection Error: Failed to retrieve answer. Please make sure the backend is running and the Groq key is active.\n\nDetails: ${error.message}`);
+            if (messageUpdater) {
+                messageUpdater.appendText(`\n⚠️ Connection Error: Failed to retrieve answer. Please make sure the backend is running.\n\nDetails: ${error.message}`);
+                messageUpdater.finalize();
+            } else {
+                appendMessage('ai', `⚠️ Connection Error: Failed to retrieve answer. Please make sure the backend is running.\n\nDetails: ${error.message}`);
+            }
             scrollToBottom();
         }
     });
 
-    // Create and append conversational speech bubble
+    // Create and append static conversational speech bubble
     function appendMessage(sender, text, context = null) {
         const messageRow = document.createElement('div');
         messageRow.className = `message-row ${sender}`;
         
-        const avatarLetter = sender === 'user' ? 'U' : 'AI';
-        
         let contextAccordionHtml = '';
         if (sender === 'ai' && context && context.trim().length > 0) {
-            // Generate distinct content id
             const uniqueId = `source-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             contextAccordionHtml = `
                 <div class="sources-accordion">
                     <button class="sources-trigger" data-target="${uniqueId}">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="9 18 15 12 9 6"></polyline>
-                        </svg>
-                        View Context Sources 📖
+                        <i data-lucide="book-open" style="width: 12px; height: 12px; margin-right: 4px;"></i>
+                        View Context Sources
                     </button>
                     <div class="sources-content" id="${uniqueId}">${escapeHtml(context)}</div>
                 </div>
             `;
         }
         
+        let contentHtml = '';
+        if (sender === 'user') {
+            contentHtml = escapeHtml(text);
+        } else {
+            contentHtml = renderMarkdown(text);
+        }
+        
+        let actionsHtml = '';
+        if (sender === 'ai') {
+            actionsHtml = `
+                <div class="message-actions-wrapper">
+                    <button class="btn-message-action btn-copy-message">
+                        <i data-lucide="copy"></i> Copy
+                    </button>
+                </div>
+            `;
+        }
+        
         messageRow.innerHTML = `
-            <div class="message-avatar">${avatarLetter}</div>
+            <div class="message-avatar">${sender === 'user' ? '<i data-lucide="user"></i>' : '<i data-lucide="bot"></i>'}</div>
             <div class="message-bubble">
-                <div class="message-text">${escapeHtml(text)}</div>
+                <div class="message-text">${contentHtml}</div>
                 ${contextAccordionHtml}
+                ${actionsHtml}
             </div>
         `;
         
         chatMessages.appendChild(messageRow);
         
-        // Attach toggles for newly generated sources trigger
+        if (sender === 'ai') {
+            messageRow.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
+        
+        lucide.createIcons();
+        
         if (contextAccordionHtml) {
             const trigger = messageRow.querySelector('.sources-trigger');
             const targetId = trigger.getAttribute('data-target');
@@ -327,32 +567,58 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // Clipboard Copy Event Listeners using delegation
+    chatMessages.addEventListener('click', (e) => {
+        // Handle Copy Code Button
+        const copyCodeBtn = e.target.closest('.btn-copy-code');
+        if (copyCodeBtn) {
+            const code = decodeURIComponent(copyCodeBtn.getAttribute('data-code'));
+            navigator.clipboard.writeText(code).then(() => {
+                showToast('Code block copied!', 'success');
+            }).catch(err => {
+                console.error('Failed to copy code block:', err);
+                showToast('Failed to copy code.', 'error');
+            });
+            return;
+        }
+        
+        // Handle Copy Response Button
+        const copyMsgBtn = e.target.closest('.btn-copy-message');
+        if (copyMsgBtn) {
+            const messageRow = copyMsgBtn.closest('.message-row');
+            const textContent = messageRow.querySelector('.message-text').innerText;
+            navigator.clipboard.writeText(textContent).then(() => {
+                showToast('Response copied!', 'success');
+            }).catch(err => {
+                console.error('Failed to copy response text:', err);
+                showToast('Failed to copy response.', 'error');
+            });
+        }
+    });
+
     // Clear conversation
     btnClearChat.addEventListener('click', () => {
-        // Remove all dynamically appended message rows
         const rows = chatMessages.querySelectorAll('.message-row');
         rows.forEach(row => row.remove());
         
-        // Reset history so the next chat starts fresh
         chatHistory = [];
-        
-        // Restore onboarding panel
         welcomeContainer.style.display = 'flex';
         conversationStarted = false;
         showToast('Chat history cleared.', 'success');
     });
 
-    // Quick prompt selector click binding
+    // Quick prompt pill handlers
     quickPrompts.addEventListener('click', (e) => {
         const pill = e.target.closest('.prompt-pill');
         if (pill) {
-            queryInput.value = pill.textContent;
-            queryInput.dispatchEvent(new Event('input')); // trigger height updates
+            const promptText = pill.innerText.trim();
+            queryInput.value = promptText;
+            queryInput.dispatchEvent(new Event('input')); // auto-grow
             queryInput.focus();
         }
     });
 
-    // Helper functions
+    // Helpers
     function scrollToBottom() {
         chatMessages.scrollTo({
             top: chatMessages.scrollHeight,
@@ -370,6 +636,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Onboarding Initializations ---
-    // Fetch file list once on load only. It refreshes automatically after each upload.
     fetchActiveFiles();
 });
